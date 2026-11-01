@@ -141,6 +141,145 @@ go run ./examples/api-client command sensor-001 restart
 
 Đặt `API_URL` nếu server không chạy ở `http://localhost:8080`. Client thiết bị TCP nằm ở `examples/tcp-device`.
 
+## Kiểm thử token (HTTP và TCP)
+
+Phần này kiểm tra server từ chối người không có token và chấp nhận người có token. Dùng **ba terminal** và cùng giá trị token cho các bên (xem [Token và xác thực](#token-và-xác-thực)).
+
+### Chuẩn bị: chạy server (terminal 1)
+
+```powershell
+$env:API_TOKEN = "api-test"
+$env:TCP_TOKEN = "tcp-test"
+go run ./cmd/server
+```
+
+### Test `TCP_TOKEN` bằng client thiết bị (terminal 2)
+
+Sai token, kỳ vọng bị từ chối và client thoát với mã lỗi:
+
+```powershell
+$env:TCP_TOKEN = "sai-token"
+go run ./examples/tcp-device
+```
+
+```text
+device authentication failed: authentication failed
+exit status 1
+```
+
+Đúng token, kỳ vọng xác thực thành công, gửi telemetry và chờ lệnh:
+
+```powershell
+$env:TCP_TOKEN = "tcp-test"
+go run ./examples/tcp-device
+```
+
+```text
+Telemetry stored. Waiting for commands; press Ctrl+C to stop.
+```
+
+Không đặt `TCP_TOKEN` thì client dừng ngay với `TCP_TOKEN must be set`, trước khi kết nối.
+
+### Test `TCP_TOKEN` bằng gói tin thô
+
+Cách này cho thấy chính xác server nhận và trả gì. Mỗi message là một dòng JSON kết thúc bằng xuống dòng. Dán hàm sau vào PowerShell (đổi cổng nếu bạn dùng `TCP_ADDR` khác):
+
+```powershell
+function Send-Tcp($lines) {
+  $c = New-Object Net.Sockets.TcpClient("127.0.0.1", 9000)
+  $c.ReceiveTimeout = 3000
+  $s = $c.GetStream()
+  $w = New-Object IO.StreamWriter($s); $w.AutoFlush = $true
+  $r = New-Object IO.StreamReader($s)
+  foreach ($l in $lines) { $w.WriteLine($l); try { $r.ReadLine() } catch { "(timeout hoặc server đã đóng kết nối)" } }
+  $c.Close()
+}
+```
+
+| Tình huống | Lệnh | Kết quả kỳ vọng |
+|---|---|---|
+| Sai token | `Send-Tcp @('{"version":1,"type":"authenticate","device_id":"sensor-001","request_id":"auth-1","token":"sai-token"}')` | `{"version":1,"type":"error","error":"authentication failed"}` rồi server đóng kết nối |
+| Bỏ qua `authenticate`, gửi telemetry giả ngay | `Send-Tcp @('{"version":1,"type":"telemetry","device_id":"sensor-001","request_id":"t-1","payload":{"temperature":999}}')` | Cùng lỗi `authentication failed`; dữ liệu giả **không** được lưu |
+| Đúng token | xem lệnh bên dưới | `authenticated`, `stored`, `pong` |
+
+Đúng token, rồi gửi telemetry và `ping`:
+
+```powershell
+Send-Tcp @(
+  '{"version":1,"type":"authenticate","device_id":"sensor-001","request_id":"auth-1","token":"tcp-test"}',
+  '{"version":1,"type":"telemetry","device_id":"sensor-001","request_id":"t-1","payload":{"temperature":23.5}}',
+  '{"version":1,"type":"ping","device_id":"sensor-001","request_id":"p-1"}'
+)
+```
+
+```text
+{"version":1,"type":"ack","request_id":"auth-1","status":"authenticated"}
+{"version":1,"type":"ack","request_id":"t-1","status":"stored"}
+{"version":1,"type":"pong","request_id":"p-1","status":"ok"}
+```
+
+Nếu mở kết nối rồi không gửi gì, server tự đóng sau 10 giây. Mọi lỗi xác thực đều trả cùng một thông báo, nên người ngoài không biết mình sai ở đâu.
+
+### Test `API_TOKEN` bằng HTTP
+
+```powershell
+$url = "http://localhost:8080/api/v1/devices/sensor-001/telemetry"
+
+# Không token -> 401
+Invoke-WebRequest $url -UseBasicParsing
+
+# Sai token -> 401
+Invoke-WebRequest $url -Headers @{ Authorization = "Bearer sai" } -UseBasicParsing
+
+# Đúng token -> 200
+Invoke-WebRequest $url -Headers @{ Authorization = "Bearer api-test" } -UseBasicParsing
+```
+
+`Invoke-WebRequest` ném lỗi khi gặp `401`; đó là kết quả mong đợi. Với `api-client`, dùng `go run ./examples/api-client telemetry sensor-001` và đổi `API_TOKEN` đúng hoặc sai để so sánh.
+
+Sau khi gửi telemetry ở bước TCP đúng token, lệnh cuối trả `200` với dữ liệu dạng:
+
+```json
+[{"device_id":"sensor-001","temperature":23.5,"recorded_at":"2026-11-01T17:22:11Z"}]
+```
+
+### Test cả luồng: ra lệnh cho thiết bị
+
+1. Terminal 2: chạy `tcp-device` với `TCP_TOKEN` đúng và để nó chạy.
+2. Terminal 3: gọi API ra lệnh.
+
+```powershell
+$env:API_TOKEN = "api-test"
+
+# Không token API -> 401, lệnh không được gửi
+Invoke-WebRequest http://localhost:8080/api/v1/devices/sensor-001/commands `
+  -Method Post -ContentType "application/json" -Body '{"command":"restart"}' -UseBasicParsing
+
+# Đúng token API -> 202 Accepted
+go run ./examples/api-client command sensor-001 restart
+```
+
+Kết quả kỳ vọng: lệnh có token trả `202 Accepted` với `{"status":"sent"}`, và terminal 2 in `Received command: restart`. Nếu `tcp-device` chưa chạy hoặc dùng sai `TCP_TOKEN`, API trả `409 device is not connected`, vì chỉ thiết bị đã xác thực mới được server giữ kết nối.
+
+Tóm tắt kỳ vọng:
+
+| Hành động | Kết quả |
+|---|---|
+| Thiết bị sai `TCP_TOKEN` | `authentication failed`, bị ngắt kết nối |
+| Thiết bị đúng `TCP_TOKEN` | `authenticated`, telemetry được lưu |
+| API không hoặc sai `API_TOKEN` | `401 unauthorized` |
+| API đúng `API_TOKEN` | `200` (xem dữ liệu) hoặc `202` (ra lệnh) |
+| Ra lệnh khi thiết bị chưa xác thực | `409 device is not connected` |
+
+### Test tự động cho token
+
+Các test này không cần chạy server:
+
+```powershell
+go test -v -run "TestServerRejectsInvalidToken|TestServerAuthenticatesAndStoresTelemetry" ./internal/transport/tcp
+go test -v -run TestListTelemetryRequiresBearerToken ./internal/handler
+```
+
 ## Chạy test
 
 ```powershell
