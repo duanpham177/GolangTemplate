@@ -11,6 +11,7 @@ Tài liệu này giải thích project theo thứ tự phù hợp cho người m
 5. [Làm việc offline với vendor](offline-vendor.md) — chuẩn bị dependency khi máy dev bị cách ly mạng.
 6. [TCP thuần cho IoT](tcp-iot.md) — giao thức, kết nối thiết bị và API đọc/gửi lệnh.
 7. [Thuật ngữ cơ bản](glossary.md) — giải thích ngắn các từ thường gặp trong code.
+8. [Luồng code, đối tượng và tư duy](code-flow-and-thinking.md) — sơ đồ đối tượng, các luồng dữ liệu và cách tiếp cận khi gặp yêu cầu mới.
 
 ## Nguyên tắc của template
 

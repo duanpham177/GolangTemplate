@@ -34,6 +34,7 @@ Nếu bạn mới học Go, hãy đọc theo thứ tự:
 5. [Làm việc offline với vendor](docs/offline-vendor.md)
 6. [TCP thuần cho IoT](docs/tcp-iot.md)
 7. [Bảng thuật ngữ cơ bản](docs/glossary.md)
+8. [Luồng code, đối tượng và tư duy](docs/code-flow-and-thinking.md)
 
 Mục lục đầy đủ nằm ở [docs/README.md](docs/README.md).
 
