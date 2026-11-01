@@ -7,3 +7,4 @@ bin/
 !.vscode/tasks.json
 !.vscode/launch.json
 .idea/
+docs/local-notes.md
