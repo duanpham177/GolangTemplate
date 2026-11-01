@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Server",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}\\cmd\\server",
+      "env": {
+        "API_TOKEN": "local-api-token-change-me",
+        "TCP_TOKEN": "local-device-token-change-me"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Go: Build server",
+      "type": "process",
+      "command": "go",
+      "args": [
+        "build",
+        "-o",
+        "${workspaceFolder}\\server.exe",
+        "./cmd/server"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Test all packages",
+      "type": "process",
+      "command": "go",
+      "args": ["test", "-count=1", "./..."],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Vet all packages",
+      "type": "process",
+      "command": "go",
+      "args": ["vet", "./..."],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Run server",
+      "type": "process",
+      "command": "go",
+      "args": ["run", "./cmd/server"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "API_TOKEN": "local-api-token-change-me",
+          "TCP_TOKEN": "local-device-token-change-me"
+        }
+      },
+      "problemMatcher": ["$go"]
+    }
+  ]
+}

@@ -3,5 +3,7 @@ bin/
 *.test
 *.out
 .env
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
 .idea/

@@ -11,21 +11,49 @@ ServerGO/
 │   ├── service/           # Tầng nghiệp vụ (business logic)
 │   ├── repository/        # Tầng truy cập dữ liệu (DB, cache...)
 │   ├── model/             # Struct dữ liệu dùng chung
-│   └── server/            # Router + middleware
+│   ├── server/            # HTTP router + middleware
+│   └── transport/tcp/     # TCP thuần cho thiết bị IoT
 ├── pkg/                   # (tùy chọn) code dùng lại được cho dự án khác
 ├── configs/               # (tùy chọn) file cấu hình
 ├── migrations/            # (tùy chọn) SQL migration
+├── docs/                  # Tài liệu hướng dẫn project
 ├── Makefile
 └── .env.example
 ```
 
-Luồng: `handler -> service -> repository`. Mỗi tầng chỉ gọi tầng bên dưới.
+Luồng nghiệp vụ: `HTTP handler / TCP transport -> service -> repository`.
+
+## Tài liệu học project
+
+Nếu bạn mới học Go, hãy đọc theo thứ tự:
+
+1. [Tổng quan cấu trúc project](docs/project-structure.md)
+2. [Luồng xử lý một request](docs/request-lifecycle.md)
+3. [Hướng dẫn thêm API mới](docs/adding-feature.md)
+4. [Chạy và kiểm thử](docs/running-testing.md)
+5. [Làm việc offline với vendor](docs/offline-vendor.md)
+6. [TCP thuần cho IoT](docs/tcp-iot.md)
+7. [Bảng thuật ngữ cơ bản](docs/glossary.md)
+
+Mục lục đầy đủ nằm ở [docs/README.md](docs/README.md).
 
 ## Chạy
 
+Trong PowerShell, đặt API token và token thiết bị trước khi chạy:
+
+```powershell
+$env:API_TOKEN = "change-this-to-a-long-random-api-token"
+$env:TCP_TOKEN = "change-this-to-a-long-random-value"
+go run ./cmd/server
 ```
-go run ./cmd/server      # hoặc: make run
-go test ./...            # hoặc: make test
+
+Server HTTP chạy ở cổng `8080`; TCP server mặc định nghe ở cổng `9000`.
+API thiết bị cần header `Authorization: Bearer <API_TOKEN>`. Chi tiết giao thức và ví dụ thiết bị nằm trong [docs/tcp-iot.md](docs/tcp-iot.md).
+
+Chạy test trong một terminal riêng:
+
+```powershell
+go test ./...
 ```
 
 Thử:
@@ -37,27 +65,6 @@ curl http://localhost:8080/api/v1/users
 
 ## Môi trường cách ly mạng (vendor)
 
-Thư mục `vendor/` chứa toàn bộ source của dependency và được commit cùng repo, nên máy dev không cần mạng. Makefile đã dùng `-mod=vendor`.
-
-**Trên máy có mạng (trung gian):**
-```
-go get github.com/ten/goi@v1.2.3   # thêm dependency
-make vendor                        # = go mod tidy + go mod vendor
-```
-Sau đó chuyển cả repo (gồm `go.mod`, `go.sum`, `vendor/`) sang máy dev (git/USB/kho nội bộ).
-
-**Trên máy dev (không mạng):**
-```
-make build    # go build -mod=vendor
-make test
-```
-
-Lưu ý:
-- Không chạy `go get` / `go mod tidy` trên máy cách ly; chỉ dùng `-mod=vendor`.
-- Luôn commit `vendor/` và `go.sum`; sau mỗi lần đổi dependency phải chạy lại `make vendor`.
-- Khi `go.mod` có `go 1.14+` và tồn tại `vendor/`, Go tự dùng vendor mặc định, nhưng vẫn nên ghi `-mod=vendor` để lỗi hiện rõ nếu vendor lệch.
-- Tùy chọn: `go env -w GOFLAGS=-mod=vendor GOPROXY=off` để chặn hẳn việc tải từ mạng.
-- `make verify-vendor` kiểm tra vendor khớp với `go.mod` (chạy khi có mạng/module cache).
-- Dự án mẫu hiện chỉ dùng thư viện chuẩn nên chưa có `vendor/`; nó sẽ xuất hiện khi bạn thêm dependency đầu tiên.
+Hướng dẫn chuẩn bị dependency trên máy có mạng và build trên máy cách ly nằm ở [docs/offline-vendor.md](docs/offline-vendor.md). Project mẫu hiện chỉ dùng thư viện chuẩn nên chưa có thư mục `vendor/`.
 
 Cần Go >= 1.22. Khi đổi tên dự án, sửa `module` trong `go.mod` và các import `servergo/...`.
